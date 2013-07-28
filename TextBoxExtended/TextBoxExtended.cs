@@ -1,40 +1,34 @@
 ﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace Extensions.System.Windows.Forms {
 	/// <summary>
-	/// Extension of TextBox that has watermark functionality and allows for retrieving and setting the caret position.
+	/// Extension of TextBox that has placeholder functionality and allows for retrieving and setting the caret position.
 	/// </summary>
 	public class TextBoxExtended : TextBox {
 		private EventHandler mGotFocus;
 		private EventHandler mLostFocus;
-		private bool mWatermarked = true;
-		private string mWatermark = string.Empty;
-		private Color mWatermarkColor = Color.Empty;
+		private EventHandler mTextChanged;
+		private bool mPlaceholderActive = true;
+		private bool mFromOwnTextChange = false;
+		private string mPlaceholder = string.Empty;
+		private Color mPlaceholderColor = Color.Empty;
 		private Color mOriginalForeColor = Color.Empty;
 
-		public TextBoxExtended() : base() {
-			base.GotFocus += new EventHandler(CaptureGotFocus);
-			base.LostFocus += new EventHandler(CaptureLostFocus);
-			GotFocus += new EventHandler(OnFocus);
-			LostFocus += new EventHandler(OnBlur);	
+		public TextBoxExtended() : base() {}
+
+		#region Designer
+		private bool IsDesignerHosted {
+			get {
+				if (DesignMode) return DesignMode;
+				if (LicenseManager.UsageMode == LicenseUsageMode.Designtime) return true;
+				return Process.GetCurrentProcess().ProcessName == "devenv";
+			}
 		}
-
-		public TextBoxExtended(string pWatermark) : this(pWatermark, Color.DarkGray) { }
-
-		public TextBoxExtended(string pWatermark, Color pWatermarkColor) : base() {
-			Watermark = pWatermark;
-			mOriginalForeColor = base.ForeColor;
-			mWatermarkColor = pWatermarkColor;
-			UseWatermark = true;
-			UpdateBox(pWatermarkColor, pWatermark);
-
-			base.GotFocus += new EventHandler(CaptureGotFocus);
-			base.LostFocus += new EventHandler(CaptureLostFocus);
-			GotFocus += new EventHandler(OnFocus);
-			LostFocus += new EventHandler(OnBlur);
-		}
+		#endregion
 
 		#region Caret setting
 		public void MoveCaret(int Line, int Column) {
@@ -45,6 +39,8 @@ namespace Extensions.System.Windows.Forms {
 			SelectionLength = 0;
 		}
 
+		[Browsable(false)]
+		[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 		public int CaretColumn {
 			get { return SelectionStart - GetFirstCharIndexOfCurrentLine(); }
 			set {
@@ -53,6 +49,8 @@ namespace Extensions.System.Windows.Forms {
 			}
 		}
 
+		[Browsable(false)]
+		[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
 		public int CaretLine {
 			get { return GetLineFromCharIndex(SelectionStart); }
 			set {
@@ -62,7 +60,7 @@ namespace Extensions.System.Windows.Forms {
 		}
 		#endregion
 
-		#region Watermark
+		#region Placeholder
 		public new event EventHandler GotFocus {
 			add { mGotFocus += value; }
 			remove { mGotFocus -= value; }
@@ -73,40 +71,59 @@ namespace Extensions.System.Windows.Forms {
 			remove { mLostFocus -= value; }
 		}
 
-		public string Value {
+		public new event EventHandler TextChanged {
+			add { mTextChanged += value; }
+			remove { mTextChanged -= value; }
+		}
+
+		private bool PreventPlaceholderUse {
+			get { return IsDesignerHosted || !UsePlaceholder; }
+		}
+
+		public new string Text {
 			get {
-				if (mWatermarked) return string.Empty;
+				if (PreventPlaceholderUse) return base.Text;
+				if (mPlaceholderActive) return string.Empty;
 				return base.Text;
 			}
 			set {
-				if (string.IsNullOrEmpty(value)) {
-					mWatermarked = true;
-					UpdateBox(mWatermarkColor, Watermark);
+				if (PreventPlaceholderUse) {
+					base.Text = value;
+					return;
 				}
-				else {
-					mWatermarked = false;
-					UpdateBox(mOriginalForeColor, value);
+
+				if (UsePlaceholder) {
+					mPlaceholderActive = string.IsNullOrEmpty(value);
+					if (mPlaceholderActive) UpdateBox(mPlaceholderColor, Placeholder);
+					else UpdateBox(mOriginalForeColor, value);
 				}
+				base.Text = value;
 			}
 		}
 
-		public string Watermark {
-			get { return mWatermark; }
+		[Description("The text of the control's placeholder.")]
+		[Category("Appearance")]
+		public string Placeholder {
+			get { return mPlaceholder; }
 			set {
-				mWatermark = value;
-				if (mWatermarked && !Focused) base.Text = mWatermark;
+				mPlaceholder = value;
+				if (!PreventPlaceholderUse && mPlaceholderActive && !Focused) base.Text = mPlaceholder;
 			}
 		}
 
-		public Color WatermarkColor {
-			get { return mWatermarkColor; }
+		[Description("The color of the control's placeholder.")]
+		[Category("Appearance")]
+		public Color PlaceholderColor {
+			get { return mPlaceholderColor; }
 			set {
-				mWatermarkColor = value;
-				if (mWatermarked && !Focused) base.ForeColor = mWatermarkColor;
+				mPlaceholderColor = value;
+				if (!PreventPlaceholderUse && mPlaceholderActive && !Focused) base.ForeColor = mPlaceholderColor;
 			}
 		}
 
-		public bool UseWatermark { get; set; }
+		[Description("Indicates if the control should use a placeholder.")]
+		[Category("Appearance")]
+		public bool UsePlaceholder { get; set; }
 
 		private void CaptureGotFocus(object pSender, EventArgs e) {
 			if (mGotFocus != null) mGotFocus(pSender, e);
@@ -115,25 +132,51 @@ namespace Extensions.System.Windows.Forms {
 		private void CaptureLostFocus(object pSender, EventArgs e) {
 			if (mLostFocus != null) mLostFocus(pSender, e);
 		}
-	
+
+		private void CaptureTextChanged(object pSender, EventArgs e) {
+			if (mTextChanged != null) mTextChanged(pSender, e);
+		}
+
 		private void OnFocus(object pSender, EventArgs e) {
-			if (UseWatermark && mWatermarked) UpdateBox(mOriginalForeColor, string.Empty);
+			if (mPlaceholderActive) UpdateBox(mOriginalForeColor, string.Empty);
 		}
 
 		private void OnBlur(object pSender, EventArgs e) {
-			if (UseWatermark) {
-				if (string.IsNullOrEmpty(base.Text)) {
-					mWatermarked = true;
-					UpdateBox(mWatermarkColor, Watermark);
-				}
-				else mWatermarked = false;
-			}
+			mPlaceholderActive = string.IsNullOrEmpty(base.Text);
+			if (mPlaceholderActive) UpdateBox(mPlaceholderColor, Placeholder);
+		}
+
+		private void OnTextChanged(object pSender, EventArgs e) {
+			if (mFromOwnTextChange) return;
+			mPlaceholderActive = string.IsNullOrEmpty(base.Text);
 		}
 
 		private void UpdateBox(Color pColor, string pText) {
 			base.ForeColor = pColor;
+			mFromOwnTextChange = true;
 			base.Text = pText;
+			mFromOwnTextChange = false;
 		}
 		#endregion
+
+		protected override void InitLayout() {
+			base.GotFocus += new EventHandler(CaptureGotFocus);
+			base.LostFocus += new EventHandler(CaptureLostFocus);
+			base.TextChanged += new EventHandler(CaptureTextChanged);
+
+			if (PreventPlaceholderUse) {
+				mPlaceholderActive = false;
+				return;
+			}
+
+			mOriginalForeColor = ForeColor;
+			ForeColor = PlaceholderColor;
+			base.Text = Placeholder;
+			GotFocus += new EventHandler(OnFocus);
+			LostFocus += new EventHandler(OnBlur);
+			TextChanged += new EventHandler(OnTextChanged);
+
+			base.InitLayout();
+		}
 	}
 }
