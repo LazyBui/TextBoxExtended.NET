@@ -31,11 +31,11 @@ namespace Extensions.System.Windows.Forms {
 		#endregion
 
 		#region Caret setting
-		public void MoveCaret(int Line, int Column) {
-			if (Line < 0 || Column < 0 || Lines.Length < Line || Text.Length < Column) {
+		public void MoveCaret(int line, int column) {
+			if (line < 0 || column < 0 || Lines.Length < line || Text.Length < column) {
 				return;
 			}
-			SelectionStart = GetFirstCharIndexFromLine(Line) + Column;
+			SelectionStart = GetFirstCharIndexFromLine(line) + column;
 			SelectionLength = 0;
 		}
 
@@ -125,36 +125,36 @@ namespace Extensions.System.Windows.Forms {
 		[Category("Appearance")]
 		public bool UsePlaceholder { get; set; }
 
-		private void CaptureGotFocus(object pSender, EventArgs e) {
-			if (mGotFocus != null) mGotFocus(pSender, e);
+		private void CaptureGotFocus(object sender, EventArgs e) {
+			if (mGotFocus != null) mGotFocus(sender, e);
 		}
 
-		private void CaptureLostFocus(object pSender, EventArgs e) {
-			if (mLostFocus != null) mLostFocus(pSender, e);
+		private void CaptureLostFocus(object sender, EventArgs e) {
+			if (mLostFocus != null) mLostFocus(sender, e);
 		}
 
-		private void CaptureTextChanged(object pSender, EventArgs e) {
-			if (mTextChanged != null) mTextChanged(pSender, e);
+		private void CaptureTextChanged(object sender, EventArgs e) {
+			if (mTextChanged != null) mTextChanged(sender, e);
 		}
 
-		private void OnFocus(object pSender, EventArgs e) {
+		private void OnFocus(object sender, EventArgs e) {
 			if (mPlaceholderActive) UpdateBox(mOriginalForeColor, string.Empty);
 		}
 
-		private void OnBlur(object pSender, EventArgs e) {
+		private void OnBlur(object sender, EventArgs e) {
 			mPlaceholderActive = string.IsNullOrEmpty(base.Text);
 			if (mPlaceholderActive) UpdateBox(mPlaceholderColor, Placeholder);
 		}
 
-		private void OnTextChanged(object pSender, EventArgs e) {
+		private void OnTextChanged(object sender, EventArgs e) {
 			if (mFromOwnTextChange) return;
 			mPlaceholderActive = string.IsNullOrEmpty(base.Text);
 		}
 
-		private void UpdateBox(Color pColor, string pText) {
-			base.ForeColor = pColor;
+		private void UpdateBox(Color foregroundColor, string text) {
+			base.ForeColor = foregroundColor;
 			mFromOwnTextChange = true;
-			base.Text = pText;
+			base.Text = text;
 			mFromOwnTextChange = false;
 		}
 		#endregion
